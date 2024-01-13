@@ -23,7 +23,7 @@ try:
     get_ipython
     getIpythonExists = True
 except:
-    getIpythonExists = True
+    getIpythonExists = False
     get_ipython={}
 from datetime import date, datetime
 import getpass
@@ -40,7 +40,7 @@ import time
 import sys
 
 class AppBase(object):
-    VERSION="1.1"
+    VERSION="1.2"
     BOLD='\033[1m'
     DARK_AMBER='\033[33m'
     DARK_BLUE='\033[34m'
@@ -186,6 +186,9 @@ class AppBase(object):
             self.mkdir(folder)
             file=self.localInstallPath()
             result = self.translateScript(source=this, target=file, useSudo=False)
+        if self.thisFile().endswith(".so"):
+            self.history_copy_static_lib(self.thisFile(), currentframe().f_lineno)
+            self.cp(self.thisFile(), self.localInstallFolder())
         self.check_env()
         if verbal:
             if self.targetApp() == '':
@@ -211,10 +214,8 @@ class AppBase(object):
             if self.allowInstallLocal():
                 if self.fromPipe():
                     return False
-                if self.ask_not_root():
-                    if self.ask_choose():
-                        try_global = False
-                        result = self.__install_local__()
+                try_global = False
+                result = self.__install_local__()
             elif sudo:
                 try_global = True
                 result = False
@@ -227,12 +228,18 @@ class AppBase(object):
                         self.msg_sudo()
                         self.removeGlobalInstaller()
                         result = self.translateScript(source=this, target=self.globalInstallPath(1),useSudo=True)
+                        if self.thisFile().endswith(".so"):
+                            self.history_copy_static_lib(self.thisFile(), currentframe().f_lineno)
+                            self.cp(self.thisFile(), self.globalInstallPath(1), useSudo=True)
                     else:
                         self.msg_sudo_failed()
                         result = False
         else:
             self.removeGlobalInstaller()
             result = self.translateScript(source=this, target=self.globalInstallPath(1))
+            if self.thisFile().endswith(".so"):
+                self.history_copy_static_lib(self.thisFile(), currentframe().f_lineno)
+                self.cp(self.thisFile(), self.globalInstallPath(1), useSudo=True)
         if result:
             if try_global and verbal:
                 self.msg_install_app_global()
@@ -243,20 +250,23 @@ class AppBase(object):
         if self.username() == 'root':
             if self.thisFile().endswith(".so"):
                 self.__self_install__(this=self.this(), verbal=verbal)
+                self.__self_install__(this=self.thisFile(), verbal=verbal)
             else:
                 self.__self_install__(this=self.thisFile(), verbal=verbal)
         elif self.ask_not_root():
             if self.sudo_test():
                 self.msg_sudo()
                 if self.thisFile().endswith(".so"):
-                    return self.__self_install__(this=self.this(), verbal=verbal, sudo=True)
+                    self.__self_install__(this=self.this(), verbal=False, sudo=True)
+                    return self.__self_install__(this=self.thisFile(), verbal=verbal, sudo=True)
                 else:
                     return self.__self_install__(this=self.thisFile(), verbal=verbal, sudo=True)
         elif self.username() != 'root':
             self.msg_root_continue()
             return False
         else:
-            if self.thisFile().endswith(".so"):
+            if self.thisFile().endswith(".so"): 
+                self.__self_install__(this=self.this(), verbal=False)
                 return self.__self_install__(this=self.thisFile(), verbal=verbal)
             else:
                 return self.__self_install__(this=self.this(), verbal=verbal)
@@ -531,7 +541,7 @@ class AppBase(object):
             return self.__python3__
 
     def check_python(self):
-        self.cmd_history("# ** Checking python version  **")
+        self.cmd_history("# ** Checking python version  **",currentframe().f_lineno)
         python2 = self.which_cmd("python2")
         python3 = self.which_cmd("python3")
         arch = 'x86_64'
@@ -635,6 +645,7 @@ class AppBase(object):
                         self.__app_path__=appPath
                 else:
                     self.__app_path__=appPath.split("/")[-1]
+        self.__app_path__ = self.__regex_current_path__.sub("/",self.__app_path__)
         return self.__app_path__
 
     def arch(self):
@@ -886,7 +897,7 @@ class AppBase(object):
                         cmd = "sudo adduser -D -G %s %s" % (group_id, username)
                     else:
                         cmd = "adduser -D -G %s %s" % (group_id, username)
-                elif self.is_debian() or self.osVersion().startswith('CentOS') or self.osVersion().startswith('Amazon Linux'):
+                elif self.is_debian() or self.osVersion().startswith('CentOS') or self.is_fedora():
                     if self.is_sudo():
                         cmd = "sudo useradd -g %d -u %d -m -s /bin/bash %s" % (group_id, user_id, username)
                     else:
@@ -897,7 +908,7 @@ class AppBase(object):
                         cmd = "sudo adduser -D -G %s -h %s %s" % (username, home, username)
                     else:
                         cmd = "adduser -D -G %s -h %s %s" % (username, home, username)
-                elif self.is_debian() or self.osVersion().startswith('CentOS') or self.osVersion().startswith('Amazon Linux'):
+                elif self.is_debian() or self.osVersion().startswith('CentOS') or self.is_fedora():
                     if self.is_sudo():
                         cmd = "sudo useradd -g %d -u %d -m -d %s -s /bin/bash %s" % (group_id, user_id, home, username)
                     else:
@@ -1506,7 +1517,7 @@ class AppBase(object):
                     cmd = "sudo addgroup -g %d %s" % (group_id, groupname)
                 else:
                     cmd = "addgroup -g %d %s" % (group_id, groupname)
-            elif self.is_debian() or self.osVersion().startswith('CentOS') or self.osVersion().startswith('Amazon Linux'):
+            elif self.is_debian() or self.osVersion().startswith('CentOS') or self.is_fedora():
                 if self.is_sudo():
                     cmd = "sudo groupadd -g %d %s" % (group_id, groupname)
                 else:
@@ -1542,7 +1553,7 @@ class AppBase(object):
         return "# modified to add ~/.local/bin to PATH" in contents
 
     def is_debian(self):
-        return self.osVersion().startswith('Ubuntu') or self.osVersion().startswith('Debian') or self.osVersion().startswith('Raspbian')
+        return self.osVersion().startswith('Ubuntu') or self.osVersion().startswith('Debian') or self.osVersion().startswith('Raspbian') or self.is_mint() or self.is_kali()
 
     def is_docker_container(self):
         if not hasattr(self, '__is_container__'):
@@ -1550,13 +1561,22 @@ class AppBase(object):
         return self.__is_container__
 
     def is_fedora(self):
-        return self.osVersion().startswith('Amazon') or self.osVersion().startswith('Fedora')
+        return self.osVersion().startswith('Amazon Linux') or self.osVersion().startswith('Fedora')
+
+    def is_kali(self):
+        return self.osVersion().startswith('Kali')
 
     def is_linux(self):
-        return not (self.osVersion()=='windows' or self.osVersion()=='macOS' or self.osVersion().startswith('macOS'))
+        return not (self.osVersion()=='windows' or self.osVersion()=='macOS' or self.osVersion().startswith('macOS')) 
 
     def is_mac(self):
         return self.osVersion()=='macOS'
+
+    def is_mint(self):
+        return self.osVersion().startswith('Linux Mint')
+
+    def is_mint(self):
+        return self.osVersion().startswith('Linux Mint')
 
     def is_ubuntu(self):
         return self.osVersion().startswith('Ubuntu')
@@ -1884,6 +1904,7 @@ class AppBase(object):
                     return True
                 elif self.cmd() == "self-install" or self.cmd() == "install" or self.cmd() == "update":
                     self.start_install()
+                    self.cmd_history_print()
                     return True
                 elif self.cmd() == "cython-string":
                     self.prn(self.cythonVersion()) 
@@ -1899,9 +1920,11 @@ class AppBase(object):
                     return True
                 elif self.cmd() == "download":
                     self.download_to_temp(verbal=True)
+                    self.cmd_history_print()
                     return True
                 elif self.cmd() == "download-app" or self.cmd() == "download-target-app":
                     self.download_to_temp(url=self.tempAppUrl(), file=self.tempTargetGzip(), verbal=True)
+                    self.cmd_history_print()
                     return True
                 elif self.cmd() == "global-installation-path":
                     self.prn(self.globalInstallPath(0))
@@ -1921,6 +1944,7 @@ class AppBase(object):
                     return True
                 elif self.cmd() == "uninstall":
                     self.selfUninstall(verbal=True)
+                    self.cmd_history_print()
                     return True
                 elif self.cmd() == "check-update" or self.cmd() == "check-version"  or self.cmd() == "check":
                     self.check_update()
@@ -2154,12 +2178,17 @@ class AppBase(object):
                 return False
 
     def root_or_sudo(self):
+        if not hasattr(self, '__history_check_root__'):
+            self.__history_check_root__ = True
+            self.cmd_history("# ** Check if user is root or can sudo **", currentframe().f_lineno)
         # root_or_sudo() Check user is root or has sudo privilege and assuming linux
         if not self.is_linux():
             return False
         if self.username()=='root':
             return True
         if not hasattr(self, '__asked_sudo__'):
+            if self.allowInstallLocal():
+                return False
             self.__asked_sudo__=True
             if self.ask_not_root():
                 self.sudo_test()
@@ -2514,7 +2543,7 @@ class AppBase(object):
             tar = self.where_cmd('tar.exe')
         else:
             tar = self.which_cmd('tar')
-        cmd= [tar,"-cvf", fname, path]
+        cmd= [tar,"-cvf", "--owner=0","--group=0","--no-same-owner","--no-same-permissions", fname, path]
         self.cmd_history(" ".join(cmd))
         result, stdout = self.shell(cmd,ignoreErr=True,ignoreAll=True)
 
@@ -2607,11 +2636,14 @@ class AppBase(object):
         return ""
 
     def this(self, this = None):
+        if not hasattr(self, '__regex_current_path__'):
+            self.__regex_current_path__ = re.compile(r"/\./")
         if this is None :
             if not hasattr(self, '__this__'):
                 self.__this__=self.appPath()
             return self.__this__
         else:
+            this = self.__regex_current_path__.sub("/",this)
             self.__this__ = this
             return self
 
@@ -3132,6 +3164,9 @@ class AppBase(object):
     def history_check_user_exists(self, line_num=None):
         self.cmd_history("# ** Try to check if the user exists  **", line_num)
 
+    def history_copy_static_lib(self, so_file, line_num=None):
+        self.cmd_history("# ** Copying static library file: %s **" % so_file, line_num)
+
     def history_copy_temp(self, line_num=None):
         self.cmd_history("# ** Try to copy from temp to target **" , line_num)
 
@@ -3446,6 +3481,7 @@ class AppBase(object):
         # msg_system_check(), this message only shown when downloading files
         if not hasattr(self,'__system_msg_shown__'):
             self.safeMsg("Now checking your operation system!", title)
+            self.prn("    AppBase Version: %s" % AppBase.VERSION)
             self.prn("    Python: %s" % self.pythonVersion())
             self.prn("    C Library: %s" % self.libcVersion())
             self.prn("    Operation System: %s" % self.osVersion())
@@ -3453,8 +3489,10 @@ class AppBase(object):
             self.prn("    Current User: %s" % self.username())
             self.prn("    Shell: %s" % self.shellCmd())
             self.prn("    Python Executable: %s" % self.executable())
+            self.prn("    python2 location: %s" % self.python2())
+            self.prn("    python3 location: %s" % self.python3())
+            self.prn("    conda location: %s" % self.which_cmd('conda'))
             self.prn("    Inside docker container: %s" % self.is_docker_container())
-            self.prn("    AppBase Version: %s" % AppBase.VERSION)
             self.prn("    Cython String: %s" % self.cythonVersion())
             self.prn("    Binary Type: %s" % self.binaryVersion() )
             self.prn("")
@@ -3501,4 +3539,3 @@ class AppBase(object):
     def __init__(self, this = None):
         if this is not None:
             self.this(this)
-
