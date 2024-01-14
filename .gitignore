@@ -1,0 +1,7 @@
+.so
+build
+lib/*.c
+lib/*.py
+src/lib
+src/*.so
+

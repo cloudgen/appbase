@@ -40,7 +40,7 @@ import time
 import sys
 
 class AppBase(object):
-    VERSION="1.2"
+    VERSION="1.3"
     BOLD='\033[1m'
     DARK_AMBER='\033[33m'
     DARK_BLUE='\033[34m'
