@@ -40,7 +40,7 @@ import time
 import sys
 
 class AppBase(object):
-    VERSION="1.3"
+    VERSION="1.4"
     BOLD='\033[1m'
     DARK_AMBER='\033[33m'
     DARK_BLUE='\033[34m'
@@ -742,10 +742,18 @@ class AppBase(object):
     def check_system(self):
         if self.pythonVersion().split(".")[0] =="3":
             self.pythonName( "python3" )
-            major = 3
+            self.pythonMajor(3)
+            try:
+                self.pythonMinor(int(self.pythonVersion().split(".")[1]))
+            except:
+                self.pythonMinor(0)
         else:
             self.pythonName( "python2" )
-            major = 2
+            self.pythonMajor(2)
+            try:
+                self.pythonMinor(int(self.pythonVersion().split(".")[1]))
+            except:
+                self.pythonMinor(0)
         minor = int(self.pythonVersion().split(".")[0])
         gcc = sys.version
         self.arch()
@@ -1325,23 +1333,31 @@ class AppBase(object):
     def install_musl_dev(self):
         if self.is_alpine():
             return self.install_package('musl-dev',['/usr/include/stdio.h'])
+        return True
 
     def install_package(self, package=None, path=None):
-        # root_or_sudo() Check user is root or has sudo privilege and assuming linux
-        if not (self.is_mac() or self.root_or_sudo()):
-            return False
         installed = False
+        self.history_check_exists(package, currentframe().f_lineno)
+        checkPath=False
         if path is not None and package is not None:
-            self.history_check_exists(package, currentframe().f_lineno)
             if isinstance(path,basestring):
                 if self.pathexists(path, use_history=True):
                     self.history_package_exists(package, currentframe().f_lineno)
-                    return True
+                    checkPath= True
+                if self.which_cmd(path):
+                    self.cmd_history(f"ls {self.which_cmd(path)}")
+                    checkPath=True
             elif isinstance(path,list):
                 for l in path:
                     if self.pathexists(l, use_history=True):
                         self.history_package_exists(package, currentframe().f_lineno)
-                        return True
+                        checkPath= True
+                    if self.which_cmd(l):
+                        self.cmd_history(f"ls {self.which_cmd(l)}")
+                        self.history_package_exists(package, currentframe().f_lineno)
+                        checkPath=True
+        if checkPath:
+            return True
         if self.update_repository():
             if self.is_debian():
                 self.history_install_package(package, currentframe().f_lineno)
@@ -1503,6 +1519,7 @@ class AppBase(object):
         return True
 
     def install_pip(self):
+        result = True
         if self.is_alpine():
             result = self.install_package('py3-pip', ['/usr/bin/pip3'])
         elif self.is_mac():
@@ -2512,7 +2529,10 @@ class AppBase(object):
 
     def start_install(self):
         if hasattr(self,"requisite") and callable(self.requisite):
-            self.requisite()
+            self.infoMsg("System requisite Found!", "REQUESITE")
+            result = self.requisite()
+        else:
+            self.infoMsg("No system requisite Found!", "NO REQUESITE")
         if self.is_local() or self.isGlobal():
             if self.need_update():
                 self.download_and_install()
@@ -2590,7 +2610,7 @@ class AppBase(object):
             tar = self.where_cmd('tar.exe')
         else:
             tar = self.which_cmd('tar')
-        cmd= [tar,"-cvf", "--owner=0","--group=0","--no-same-owner","--no-same-permissions", fname, path]
+        cmd= [tar, "--owner=0","--group=0","--no-same-owner","--no-same-permissions","-cvf", fname, path]
         self.cmd_history(" ".join(cmd))
         result, stdout = self.shell(cmd,ignoreErr=True,ignoreAll=True)
 
@@ -2786,6 +2806,10 @@ class AppBase(object):
 
     def which_cmd(self, cmd, default=""):
         stdout = ''
+        if "/" in cmd:
+            cmd= cmd.split("/")[-1]
+        if "\\" in cmd:
+            cmd= cmd.split("\\")[-1]
         if self.isCmd() or self.isGitBash():
             return self.where_cmd(cmd)
         elif self.isLinuxShell():
@@ -3261,7 +3285,7 @@ class AppBase(object):
         self.cmd_history("# ** Open %s as the location for writing **" % f, line_num)
 
     def history_package_exists(self, package, line_num=None):
-        self.cmd_history("# ** Package: %s exists and no installation for it **" % package, line_num)
+        self.cmd_history("# Package: %s exists and no installation for it **" % package, line_num)
 
     def history_remove_downloaded(self, line_num=None):
         self.cmd_history("# ** Try to remove downloaded file **", line_num)
