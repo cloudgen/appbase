@@ -607,7 +607,7 @@ class AppBase(object):
             if isinstance(command, basestring):
                 cmd = command
             elif isinstance(command, list):
-                cmd = " ".join(cmd)
+                cmd = " ".join(command)
             else:
                 cmd = ""
             if cmd.startswith("# **"):
