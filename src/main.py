@@ -21,14 +21,33 @@ if [ -f /usr/bin/sw_vers ]; then WHICH='which';elif [ -f /usr/bin/which ]; then 
 # This is code from online-installer, homepage: https://github.com/cloudgen2/online-installer
 exit 0
 ":"""
+from lib.appbase import Sh
+from lib.appbase import Which
+from lib.appbase import AppData
+from lib.appbase import MsgBase
+from lib.appbase import CmdHistory
+from lib.appbase import Shell
+from lib.appbase import AppHistory
+from lib.appbase import OS
+from lib.appbase import AppMsg
+from lib.appbase import Installer
+from lib.appbase import AppPara
+from lib.appbase import FromPipe
+from lib.appbase import Ask
+from lib.appbase import ShellProfile
+from lib.appbase import Curl
+from lib.appbase import Temp
 from lib.appbase import AppBase
+
 class AppBaseTest(AppBase):
     def start(self):
         self.allowInstallLocal(False).allowDisplayInfo(True).allowSelfInstall(False)
         if not self.parseArgs(self.usage()):
             self.msg_info()
+        m = MsgBase()
+        m.safeMsg("Thank you for using AppBase", "APPBASE")
 
 if __name__ == "__main__":
     app = AppBaseTest(__file__)
-    app.setInstallation(appName='appbasetest',author='Cloudgen Wong',homepage="https://github.com/cloudgen/appbase",downloadUrl="https://dl.leolio.page/appbasetest",lastUpdate='2024-1-10',majorVersion=1,minorVersion=10)
+    app.setInstallation(appName='appbasetest',author='Cloudgen Wong',homepage="https://github.com/cloudgen/appbase",downloadUrl="https://dl.leolio.page/appbasetest",lastUpdate='2024-1-26',majorVersion=1,minorVersion=26)
     app.start()
