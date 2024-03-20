@@ -1,3 +1,26 @@
+#!/bin/sh
+# -*- coding: utf-8 -*-
+##! 0<0# : ^
+##! """
+##! @echo off
+##! SET F="C:\\Users\\%USERNAME%\\AppData\\Local\\Microsoft\\WindowsApps\\python.exe"
+##! if exist %F% ( del /s %F% >nul 2>&1 )
+##! SET G="C:\\Users\\%USERNAME%\\AppData\\Local\\Microsoft\\WindowsApps\\python3.exe"
+##! if exist %G% ( del /s %G% >nul 2>&1 )
+##! FOR /F "tokens=*" %%g IN ('where python.exe') do (SET VAR=%%g)
+##! if exist %VAR% (
+##!     python "%~f0" %*
+##!     exit /b 0
+##! )
+##! FOR /F "tokens=*" %%g IN ('where python3.exe') do (SET VAR=%%g)
+##! if exist %VAR% ( python3 "%~f0" %* )
+##! exit /b 0
+##! """
+""":"
+if [ -f /usr/bin/sw_vers ]; then WHICH='which';elif [ -f /usr/bin/which ]; then WHICH='/usr/bin/which';elif [ -f /bin/which ]; then WHICH='/bin/which';elif [ -f "C:\\Windows\\System32\\where.exe" ]; then WHICH="C:\\Windows\\System32\\where.exe";fi; if [ ! -z $WHICH ]; then _PY_=$($WHICH python3);if [ -z $_PY_ ]; then _PY_=$($WHICH python2); if [ -z $_PY_ ]; then _PY_=$($WHICH pypy3); if [ -z $_PY_ ]; then _PY_=$($WHICH pypy); if [ -z $_PY_ ]; then _PY_=$($WHICH python); if [ -z $_PY_ ]; then echo 'No Python Found'; fi; fi; fi; fi; fi; if [ ! -z "$_PY_" ]; then WINPTY=$($WHICH winpty.exe 2>/dev/null);if [ ! -z "$WINPTY" ]; then PY_EXE=$($WHICH python.exe 2>/dev/null);if [ ! -z "$PY_EXE" ]; then exec "$WINPTY" "$PY_EXE" "$0" "$@";exit 0;fi;else exec $_PY_ "$0" "$@";exit 0;fi;fi;fi;if [  -f /usr/bin/python3 ]; then exec /usr/bin/python3 "$0" "$@";exit 0;fi;if [  -f /usr/bin/python2 ]; then exec /usr/bin/python2 "$0" "$@";exit 0;fi;if [  -f /usr/bin/python ]; then exec /usr/bin/python "$0" "$@";exit 0;fi;if [  -f /usr/bin/pypy3 ]; then exec /usr/bin/pypy3 "$0" "$@";exit 0;fi ;if [  -f /usr/bin/pypy ]; then exec /usr/bin/pypy "$0" "$@";exit 0;fi
+# This is code from online-installer, homepage: https://github.com/cloudgen2/online-installer
+exit 0
+":"""
 from __future__ import print_function
 try:
     raw_input
@@ -722,7 +745,7 @@ class Shell(CmdHistory, Which):
             self.shellCmd() == '/bin/sh' or self.shellCmd() == '/bin/ash' or \
             self.shellCmd() == '/usr/bin/fish'
 
-    def mkdir(self, path):
+    def mkdir(self, path, sudo = False):
         if not self.pathexists( path ):
             if self.osVersion() == 'windows':
                 dir_split = path.split('\\')
@@ -734,7 +757,10 @@ class Shell(CmdHistory, Which):
                         if not self.pathexists(dirloc):
                             os.mkdir( dirloc )
             else:
-                self.cmd_history("mkdir -p %s" % path)
+                if sudo:
+                    self.cmd_history("sudo mkdir -p %s" % path)
+                else:
+                    self.cmd_history("mkdir -p %s" % path)
                 dir_split = path.split('/')
                 dirloc = ''
                 for dirlet in dir_split:
@@ -742,7 +768,10 @@ class Shell(CmdHistory, Which):
                         dirloc = dirloc + '/' + dirlet
                         if not self.pathexists(dirloc):
                             try:
-                                os.mkdir( dirloc )
+                                if sudo:
+                                    self.shell(f"sudo mkdir -p {dirloc}")
+                                else:
+                                    os.mkdir( dirloc )
                             except:
                                 self.msg_permission_denied(dirloc)
                                 return False
@@ -970,7 +999,10 @@ class Shell(CmdHistory, Which):
             tar = self.where_cmd('tar.exe')
         else:
             tar = self.which_cmd('tar')
-        cmd= [tar, "--no-same-owner","--no-same-permissions","-cvf", fname, path]
+        if self.is_mac():
+            cmd= [tar,"--uid","0","--gid","0", "--no-same-owner","--no-same-permissions","-cvf", fname, path]
+        else:
+            cmd= [tar,"--owner=0", "--group=0", "--no-same-owner","--no-same-permissions","-cvf", fname, path]
         self.cmd_history(" ".join(cmd))
         result, stdout = self.shell(cmd,ignoreErr=True,ignoreAll=True)
 
@@ -1046,7 +1078,7 @@ class AppHistory(Shell):
         self.cmd_history("# ** Try to check and modify ~/.zshenv **", line_num)
 
     def history_compress(self, target_file, line_num=None):
-        self.cmd_history("# ** Trying to create compressed file {target_file} for container **", currentframe().f_lineno)
+        self.cmd_history(f"# ** Trying to create compressed file {target_file} for container **", currentframe().f_lineno)
 
     def history_create_soft_link(self, line_num=None):
         self.cmd_history("# ** Try to create soft link **", line_num)
@@ -1406,7 +1438,6 @@ class OS(AppHistory):
         return self.uname('-m')
 
 class AppMsg(OS):
-
 
     def msg_alpine_detected(self, title="OPERATION SYSTEM"):
         self.infoMsg("Alpine Detected!", title)
@@ -1925,14 +1956,23 @@ class Installer(OS):
             self.cmd_history("# Both python2 and python3 not found! ")
 
 
-    def install_python_package(self, package):
+    def install_python_package(self, package, sudo=False):
         self.history_install_package(package, currentframe().f_lineno)
         if self.is_ubuntu() and self.os_major_version()>22:
-            cmd = 'pip3 install --upgrade --break-system-packages %s' % package
+            if sudo:
+                cmd = 'sudo pip3 install --upgrade --break-system-packages %s' % package
+            else:
+                cmd = 'pip3 install --upgrade --break-system-packages %s' % package
         elif self.osVersion().startswith('Debian') and self.os_major_version()>14271:
-            cmd = 'pip3 install --upgrade --break-system-packages %s' % package
+            if sudo:
+                cmd = 'sudo pip3 install --upgrade --break-system-packages %s' % package
+            else:
+                cmd = 'pip3 install --upgrade --break-system-packages %s' % package
         else:
-            cmd = 'pip3 install --upgrade %s' % package
+            if sudo:
+                cmd = 'sudo pip3 install --upgrade %s' % package
+            else:
+                cmd = 'pip3 install --upgrade %s' % package
         self.cmd_history(cmd)
         self.shell(cmd,ignoreErr=True)
 
@@ -1964,8 +2004,12 @@ class Installer(OS):
         result = self.install_musl_dev()
         result = self.install_pip()
         if result:
-            self.install_python_package('jupyter')
-            self.install_python_package('jupyterhub')
+            if self.username() == "root":
+                self.install_python_package('jupyter')
+                self.install_python_package('jupyterhub')
+            else:
+                self.install_python_package('jupyter', sudo=True)
+                self.install_python_package('jupyterhub', sudo=True)
         if result:
             result = self.install_package('nginx', ['/usr/sbin/nginx','/usr/bin/nginx'])
         if result:
@@ -2123,7 +2167,6 @@ class Installer(OS):
                 else:
                     cmd = '%s add %s default' % (rc_cmd, package)
 
-
     def update_repository(self):
         # root_or_sudo() Check user is root or has sudo privilege and assuming linux
         cmd = ""
@@ -2151,12 +2194,16 @@ class Installer(OS):
             return True
         return False
 
-    def unisntall_gcc(self):
+    def uninstall_gcc(self):
         return self.uninstall_package('gcc', ['/usr/bin/gcc'])
 
     def uninstall_jupyter(self):
-        self.uninstall_python_package('jupyter')
-        self.uninstall_python_package('jupyterhub')
+        if self.username() == "root":
+            self.uninstall_python_package('jupyter')
+            self.uninstall_python_package('jupyterhub')
+        else:
+            self.uninstall_python_package('jupyter', sudo=True)
+            self.uninstall_python_package('jupyterhub', sudo=True)
         result = self.uninstall_gcc()
         result = self.uninstall_package('python3-dev',['/usr/include/python3.8/Python.h','/usr/include/python3.9/Python.h','/usr/include/python3.10/Python.h','/usr/include/python3.11/Python.h','/usr/include/python3.12/Python.h'])
         if self.is_alpine():
@@ -2222,16 +2269,28 @@ class Installer(OS):
                 backup_source="/etc/nginx/sites-available"        
         if backup_source != "":
             next_id = 0
-            self.mkdir('/var/nginx-backup')
-            for id in range(99):
-                test_path='/var/nginx-backup/%s.%d' % (self.today(), id)
+            if self.is_docker_container():
+                backup_path='/data/nginx-backup'
+            else:
+                backup_path='/var/nginx-backup'
+            if self.username() == 'root':
+                self.mkdir(backup_path)
+            else:
+                self.mkdir(backup_path, sudo=True)
+            for id in range(999):
+                test_path='%s/%s.%d' % (backup_path, self.today(), id)
                 if self.pathexists(test_path):
                     next_id = id + 1
-            if next_id > 99:
+            if next_id > 999:
                 self.msg_too_many_backup()
                 return False
-            backup_destination='/var/nginx-backup/%s.%d' % (self.today(), next_id)
-            shutil.copytree(backup_source, backup_destination)
+            backup_destination='%s/%s.%d' % (backup_path, self.today(), next_id)
+            if self.username() == 'root':
+                shutil.copytree(backup_source, backup_destination)
+            else:
+                self.mkdir(backup_destination, sudo=True)
+                self.shell(f"sudo cp -rP {backup_source}/* {backup_destination}")
+            self.cmd_history(f"sudo cp -rP {backup_source}/* {backup_destination}")
         result = self.uninstall_package('nginx', ['/usr/sbin/nginx','/usr/bin/nginx'])
         return result
 
@@ -2297,9 +2356,12 @@ class Installer(OS):
                 return False
         return installed
 
-    def uninstall_python_package(self, package=None):
+    def uninstall_python_package(self, package=None, sudo=False):
         self.history_uninstall_package('jupyter', currentframe().f_lineno)
-        cmd = 'pip3 uninstall --break-system-packages %s' % package
+        if sudo:
+            cmd = 'sudo pip3 uninstall --break-system-packages %s' % package
+        else:
+            cmd = 'pip3 uninstall --break-system-packages %s' % package
         self.cmd_history(cmd)
         self.shell(cmd,ignoreErr=True)
 
@@ -2717,7 +2779,7 @@ class Temp(Shell):
         return ""
 
 class AppBase(Installer, AppPara, Ask, ShellProfile, FromPipe, AppMsg, Curl, Temp):
-    VERSION="1.7"
+    VERSION="1.10"
 
     __here__ = __file__
 
@@ -3287,9 +3349,11 @@ class AppBase(Installer, AppPara, Ask, ShellProfile, FromPipe, AppMsg, Curl, Tem
                     self.check_update()
                     return True
                 elif self.allowDisplayInfo():
+                    print("2")
                     self.msg_info(usage)
                     return True
             elif self.allowDisplayInfo():
+                print("1")
                 self.msg_info(usage)
                 return True
         if self.allowSelfInstall():
@@ -3651,3 +3715,6 @@ class AppBase(Installer, AppPara, Ask, ShellProfile, FromPipe, AppMsg, Curl, Tem
     def __init__(self, this = None):
         if this is not None:
             self.this(this)
+        else:
+            self.this(__file__)
+
