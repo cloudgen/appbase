@@ -974,6 +974,8 @@ class Shell(CmdHistory, Which):
             stdout, stderr = Popen([ self.shellCmd() , '-c',"sudo echo %s" % msg ] \
                 ,stdin=PIPE,stdout=PIPE,stderr=PIPE,\
                 universal_newlines=True ).communicate( "%s\n" % sudoPassword )
+            if self.signal() == 2:
+                return False
             trial=trial + 1
         if trial < 3:
             self.is_sudo( True )
@@ -988,7 +990,7 @@ class Shell(CmdHistory, Which):
             elif useSudo or self.sudo_test():
                 if self.sudo_cmd() != "":
                     cmd = '%s %s -rf %s' % (self.sudo_cmd(), rm_cmd, filePath)
-            if cmd=="" :
+            if cmd=="" or self.signal == 3:
                 return False
             self.cmd_history(cmd)
             self.shell( cmd )
@@ -1513,7 +1515,7 @@ class AppMsg(OS):
             '    "%s"' % self.homepage(),
             '',
             'Installation command:',
-            '    curl -fsSL %s|%s' % (self.downloadUrl(), python_exe),
+            '    curl -fsSL %s | %s' % (self.downloadUrl(), python_exe),
             ''
         ]
         starLine=[]
@@ -2477,7 +2479,10 @@ class Ask(FromPipe):
         # fromPipe() usually involve from curl and don't have stdin
         if self.fromPipe():
             return None
-        return self.__ask_number__('Choose the profile number? ')
+        number = self.__ask_number__('Choose the profile number? ')
+        if number is None:
+            return -1
+        return number
 
     def ask_create_ini(self):
         # fromPipe() usually involve from curl and don't have stdin
@@ -2530,11 +2535,11 @@ class Ask(FromPipe):
         return self.__signal__
 
     def signal_handler(self, sig, frame):
+        self.signal(sig)
         if sig == 2:
             self.prn('\nYou pressed Ctrl+C!\nPress Enter to Leave!')
         if sig == 3:
             self.prn('\nYou pressed Ctrl+\!')
-        self.signal(sig)
 
 class ShellProfile(Shell):
 
@@ -2779,7 +2784,7 @@ class Temp(Shell):
         return ""
 
 class AppBase(Installer, AppPara, Ask, ShellProfile, FromPipe, AppMsg, Curl, Temp):
-    VERSION="1.10"
+    VERSION="1.11"
 
     __here__ = __file__
 
@@ -2842,7 +2847,8 @@ class AppBase(Installer, AppPara, Ask, ShellProfile, FromPipe, AppMsg, Curl, Tem
                             self.history_copy_static_lib(self.thisFile(), currentframe().f_lineno)
                             self.cp(self.thisFile(), self.globalInstallPath(1), useSudo=True)
                     else:
-                        self.msg_sudo_failed()
+                        if self.signal() != 2:
+                            self.msg_sudo_failed()
                         result = False
         else:
             self.removeGlobalInstaller()
@@ -2871,6 +2877,8 @@ class AppBase(Installer, AppPara, Ask, ShellProfile, FromPipe, AppMsg, Curl, Tem
                     return self.__self_install__(this=self.thisFile(), verbal=verbal, sudo=True)
                 else:
                     return self.__self_install__(this=self.thisFile(), verbal=verbal, sudo=True)
+            elif self.signal() == 2:
+                return False
         elif self.username() != 'root':
             self.msg_root_continue()
             return False
@@ -3489,7 +3497,7 @@ class AppBase(Installer, AppPara, Ask, ShellProfile, FromPipe, AppMsg, Curl, Tem
                         self.sudoRemoveFile(self.globalInstallPath(1))
                         result = True
                 else:
-                    if verbal:
+                    if verbal and self.signal() != 2:
                         self.msg_unintall_need_root()
                     return False
             else:
