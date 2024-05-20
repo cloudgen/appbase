@@ -21,18 +21,21 @@ if [ -f /usr/bin/sw_vers ]; then WHICH='which';elif [ -f /usr/bin/which ]; then 
 # This is code from online-installer, homepage: https://github.com/cloudgen2/online-installer
 exit 0
 ":"""
+from lib.appbase import Attr
+from lib.appbase import Transition
+from lib.appbase import FiniteStateMachine
+from lib.appbase import Reflection
 from lib.appbase import Sh
-from lib.appbase import Which
 from lib.appbase import AppData
 from lib.appbase import MsgBase
 from lib.appbase import CmdHistory
-from lib.appbase import Shell
 from lib.appbase import AppHistory
 from lib.appbase import OS
 from lib.appbase import AppMsg
+from lib.appbase import Shell
 from lib.appbase import Installer
+from lib.appbase import CheckSystem
 from lib.appbase import AppPara
-from lib.appbase import FromPipe
 from lib.appbase import Ask
 from lib.appbase import ShellProfile
 from lib.appbase import Curl
